@@ -245,14 +245,28 @@
 
      // ========= 轉盤繪圖 =========
    function drawWheel(){
+     // 獲取所有有籤數的帳號，以及當前內定的帳號（即使籤數為0）
      const list = accounts.filter(a=>(a.tickets|0) > 0);
+     const riggedAccount = (rigNextId || rigSelect.value) ? accounts.find(a => a.id === (rigNextId || Number(rigSelect.value))) : null;
+     
+     // 如果內定帳號籤數為0且不在列表中，添加它
+     let displayList = list.slice();
+     if (riggedAccount && (riggedAccount.tickets|0) === 0 && !displayList.find(a => a.id === riggedAccount.id)) {
+       displayList.push({
+         id: riggedAccount.id,
+         name: riggedAccount.name,
+         color: riggedAccount.color || '#ccc',
+         tickets: 0.00001 // 給予極小籤數以便顯示
+       });
+     }
+     
      const W=wheel.width,H=wheel.height,cx=W/2,cy=H/2,r=Math.min(cx,cy)-8;
      wctx.clearRect(0,0,W,H);
 
-     const totalTickets = Math.max(sum(list, a=>a.tickets|0), 0.000001);
+     const totalTickets = Math.max(sum(displayList, a=>a.tickets|0), 0.000001);
      let start = (currentRotation % 360) * Math.PI/180;
 
-     list.forEach(a=>{
+     displayList.forEach(a=>{
        const frac = (a.tickets|0)/totalTickets;
        const sweep = frac * Math.PI*2;
 
@@ -280,7 +294,7 @@
      // 中心圓
      wctx.beginPath(); wctx.arc(cx,cy,r*0.1,0,Math.PI*2);
      wctx.fillStyle='#fff'; wctx.fill();
-     wctx.strokeStyle='#ddd'; wctx.stroke();
+     wctx.strokeStyle = '#ddd'; wctx.stroke();
    }
   function wrapText(ctx, text, x,y, maxW, lh){
     const chars = (text||'').split(''); let line='', yoff=0;
@@ -480,14 +494,24 @@
      const winner = accounts.find(a=>a.id===winnerId);
      if (!winner) return currentRotation + (360*18) + Math.random()*360;
 
-     // 獲取所有有籤數的帳號
-     const list = accounts.filter(a=>(a.tickets|0)>0);
+     // 使用與 drawWheel 相同的邏輯來構建顯示列表
+     const list = accounts.filter(a=>(a.tickets|0) > 0);
+     const riggedAccount = (rigNextId || rigSelect.value) ? accounts.find(a => a.id === (rigNextId || Number(rigSelect.value))) : null;
      
-     // 如果中獎者不在顯示列表中，創建一個臨時列表包含他
-     let tempList = list.slice();
-     if (!tempList.find(x=>x.id===winnerId)) {
-       // 給予一個極小的籤數，確保他能被指向
-       tempList.push({ 
+     // 如果內定帳號籤數為0且不在列表中，添加它
+     let displayList = list.slice();
+     if (riggedAccount && (riggedAccount.tickets|0) === 0 && !displayList.find(a => a.id === riggedAccount.id)) {
+       displayList.push({
+         id: riggedAccount.id,
+         name: riggedAccount.name,
+         color: riggedAccount.color || '#ccc',
+         tickets: 0.00001 // 給予極小籤數以便顯示
+       });
+     }
+     
+     // 如果中獎者不在顯示列表中，添加它
+     if (!displayList.find(x=>x.id===winnerId)) {
+       displayList.push({ 
          id: winner.id, 
          name: winner.name, 
          color: winner.color || '#ccc', 
@@ -495,9 +519,9 @@
        });
      }
 
-     // 如果沒有任何有籤數的用戶，且中獎者籤數也為0，給予中獎者一個臨時籤數
-     if (tempList.length === 0) {
-       tempList.push({ 
+     // 如果沒有任何用戶，給予中獎者一個臨時籤數
+     if (displayList.length === 0) {
+       displayList.push({ 
          id: winner.id, 
          name: winner.name, 
          color: winner.color || '#ccc', 
@@ -506,14 +530,14 @@
      }
 
      // 計算總籤數
-     const total = tempList.reduce((s,a)=> s + ((a.tickets||0)*1), 0);
+     const total = displayList.reduce((s,a)=> s + ((a.tickets||0)*1), 0);
      if (total <= 0) return currentRotation + (360*18) + Math.random()*360;
 
      // 計算每個切片的角度
      let startDeg = (currentRotation % 360 + 360) % 360;
      let acc = 0;
 
-     for (const a of tempList) {
+     for (const a of displayList) {
        const sweep = ((a.tickets||0)/total) * 360;
        const segStart = startDeg + acc;
        const mid = segStart + sweep/2;
