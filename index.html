@@ -534,7 +534,7 @@
     } else if(rigSelect.value) {
       const riggedPerson = accounts.find(a => a.id === Number(rigSelect.value));
       if(riggedPerson) {
-        tip.textContent = `🎯 已設定內定下一轉：${riggedPerson.name}，等待抽獎…`;
+        // tip.textContent = `🎯 已設定內定下一轉：${riggedPerson.name}，等待抽獎…`;
       } else {
         tip.textContent = '設定已更新，等待抽獎…';
       }
