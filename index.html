@@ -354,7 +354,7 @@
          <td><input class="form-control form-control-sm" value="${a.name}"></td>
          <td class="text-center">
            <div class="form-check d-flex justify-content-center">
-             <input class="form-check-input rigbox" type="checkbox" ${(rigNextId===a.id || rigSelect.value==a.id)?'checked':''}>
+             <input class="form-check-input rigbox" type="radio" name="riggedUser" value="${a.id}" ${(rigNextId===a.id || rigSelect.value==a.id)?'checked':''}>
            </div>
          </td>
          <td class="text-center"><button class="btn btn-sm btn-outline-danger del">刪除</button></td>
@@ -366,13 +366,12 @@
        // 內定（每列）
        tr.children[2].querySelector('.rigbox').addEventListener('change', ev=>{
          if(ev.target.checked){ 
+           // radio button 被選中時，設定為內定
            rigNextId = a.id; 
            rigSelect.value = a.id;
-         } else if(rigNextId===a.id || rigSelect.value==a.id){ 
-           rigNextId = null; 
-           rigSelect.value = '';
          }
-         persist(); renderAdminTable(); rebuildRigSelect();
+         persist(); rebuildRigSelect();
+         updateStatusDisplay();
        });
        // 刪除
        tr.children[3].querySelector('.del').addEventListener('click', ()=>{
@@ -383,11 +382,43 @@
        });
        adminTbody.appendChild(tr);
      });
+     
+     // 添加「不內定」選項
+     const noRigTr = document.createElement('tr');
+     noRigTr.innerHTML = `
+       <td>-</td>
+       <td><span class="text-muted">不內定</span></td>
+       <td class="text-center">
+         <div class="form-check d-flex justify-content-center">
+           <input class="form-check-input rigbox" type="radio" name="riggedUser" value="" ${(!rigNextId && !rigSelect.value)?'checked':''}>
+         </div>
+       </td>
+       <td class="text-center">-</td>
+     `;
+     
+     // 不內定選項的事件處理
+     noRigTr.children[2].querySelector('.rigbox').addEventListener('change', ev=>{
+       if(ev.target.checked){ 
+         // 選擇不內定時，清除內定設定
+         rigNextId = null; 
+         rigSelect.value = '';
+       }
+       persist(); rebuildRigSelect();
+       updateStatusDisplay();
+     });
+     
+     adminTbody.appendChild(noRigTr);
    }
   function rebuildRigSelect(){
     const prev = rigSelect.value || '';
     rigSelect.innerHTML = `<option value="">（不內定）</option>` + accounts.map(a=>`<option value="${a.id}">${a.name}</option>`).join('');
-    rigSelect.value = prev;
+    
+    // 檢查之前選中的值是否還存在於新的選項中
+    if (prev && accounts.find(a => a.id == prev)) {
+      rigSelect.value = prev;
+    } else {
+      rigSelect.value = '';
+    }
     
     // 同步更新状态显示
     updateStatusDisplay();
@@ -461,6 +492,16 @@
          name: winner.name, 
          color: winner.color || '#ccc', 
          tickets: 0.00001 
+       });
+     }
+
+     // 如果沒有任何有籤數的用戶，且中獎者籤數也為0，給予中獎者一個臨時籤數
+     if (tempList.length === 0) {
+       tempList.push({ 
+         id: winner.id, 
+         name: winner.name, 
+         color: winner.color || '#ccc', 
+         tickets: 1 
        });
      }
 
@@ -575,12 +616,20 @@
 
   document.getElementById('clearRig').addEventListener('click', ()=>{
     rigNextId=null; rigSelect.value=''; persist();
+    renderAdminTable(); // 重新渲染管理表格以選中「不內定」選項
     updateStatusDisplay();
     showToast('已清除內定。','light');
   });
 
   rigSelect.addEventListener('change', ()=>{
-    // 更新状态显示
+    // 當從下拉選單選擇時，更新內定設定
+    if (rigSelect.value) {
+      rigNextId = Number(rigSelect.value);
+    } else {
+      rigNextId = null;
+    }
+    persist();
+    renderAdminTable(); // 重新渲染管理表格以更新radio button狀態
     updateStatusDisplay();
   });
 
@@ -593,7 +642,15 @@
      const wasRigged = rigNextId || rigSelect.value;
      
      const winner = pickWinner();
-     if (!winner){ showToast('籤數總和為 0，無法抽獎。','danger'); return; }
+     if (!winner){ 
+       // 如果是內定抽獎但找不到用戶，顯示錯誤
+       if (wasRigged) {
+         showToast('內定的用戶不存在，請重新設定。','danger'); 
+       } else {
+         showToast('籤數總和為 0，無法抽獎。','danger'); 
+       }
+       return; 
+     }
 
      const target = targetAngleForWinner(winner.id);
      spinning = true;
@@ -602,7 +659,7 @@
      if(wasRigged) {
     //    tip.textContent = `🎯 內定抽出「${winner.name}」…`;
      } else {
-       tip.textContent = `正在抽出「${winner.name}」…`;
+      //  tip.textContent = `正在抽出「${winner.name}」…`;
      }
      
      animateTo(target, 4000);
